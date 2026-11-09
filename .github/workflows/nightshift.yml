@@ -33,6 +33,7 @@ env:
   NIGHTSHIFT_MODEL: ${{ vars.NIGHTSHIFT_MODEL || 'claude-sonnet-5-5' }}
   NIGHTSHIFT_MAX_TURNS: ${{ vars.NIGHTSHIFT_MAX_TURNS || '60' }}
   NIGHTSHIFT_MAX_BUDGET_USD: ${{ vars.NIGHTSHIFT_MAX_BUDGET_USD || '3' }}
+  NIGHTSHIFT_MAX_OPEN_PRS: ${{ vars.NIGHTSHIFT_MAX_OPEN_PRS || '3' }}
 
 jobs:
   shift:

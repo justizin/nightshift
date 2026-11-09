@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Decide what this run should do. Prints `mode repo number` and writes the same to $GITHUB_OUTPUT.
 #   followup <repo> <pr>     an open nightshift PR the owner commented on or requested changes to
-#   issue    <repo> <issue>  the highest-priority open issue labeled `nightshift` with no PR yet
-#   propose  - -             queue empty: propose issues from GOALS.md (at most once per day)
+#   issue    <repo> <issue>  an open issue with no PR yet: owner-labeled `nightshift` first, then the bot's own proposals
+#   propose  - -             nothing queued: find new work from GOALS.md and file it (at most once per day)
 #   none     - -             nothing to do
 # Needs GH_TOKEN (the bot's classic PAT, scope repo), OWNER (GitHub login of the human owner/reviewer).
 set -euo pipefail
@@ -43,30 +43,61 @@ for repo in $repos; do
   [ -n "$pr" ] && emit followup "$repo" "$pr"
 done
 
-# 2. Labeled issues, p1 first, then oldest. Skip ones already in progress, blocked, or with an open PR.
+# Helpers shared by steps 2 and 3.
+has_pr() {  # repo num -> 0 if an open nightshift PR already covers the issue
+  gh pr list -R "$1" --state open --search 'head:nightshift/issue-' --limit 100 --json headRefName --jq '.[].headRefName' 2>/dev/null | grep -qx "nightshift/issue-$2"; }
+is_blocked() {  # repo num -> 0 if the bot said "nightshift: blocked" and the owner has not replied since
+  gh issue view "$2" -R "$1" --json comments 2>/dev/null | jq -r --arg o "$OWNER" '
+    (.comments | map(select(.body | ascii_downcase | startswith("nightshift: blocked"))) | last // empty) as $b
+    | if $b == null then false else ([.comments[] | select(.author.login == $o and .createdAt > $b.createdAt)] | length == 0) end' 2>/dev/null | grep -qx true; }
+SKIP='(index("nightshift:in-progress") or index("nightshift:blocked") or index("nightshift:hold"))'
+
+# 2. Issues the owner labeled `nightshift`: p1 first, then oldest.
 best=""; best_key=""
 for repo in $repos; do
-  heads=$(gh pr list -R "$repo" --state open --search 'head:nightshift/issue-' --limit 100 --json headRefName --jq '.[].headRefName' 2>/dev/null || true)
   while IFS=$'\t' read -r num created p1; do
     [ -z "$num" ] && continue
-    echo "$heads" | grep -qx "nightshift/issue-$num" && continue
-    # blocked without labels: a comment by the bot that starts with "nightshift: blocked" and no owner reply after it
-    if gh issue view "$num" -R "$repo" --json comments 2>/dev/null | jq -r --arg o "$OWNER" '
-         (.comments | map(select(.body | ascii_downcase | startswith("nightshift: blocked"))) | last // empty) as $b
-         | if $b == null then false else ([.comments[] | select(.author.login == $o and .createdAt > $b.createdAt)] | length == 0) end' 2>/dev/null | grep -qx true; then continue; fi
+    has_pr "$repo" "$num" && continue
+    is_blocked "$repo" "$num" && continue
     key="$([ "$p1" = true ] && echo 0 || echo 1)-$created"
     if [ -z "$best_key" ] || [[ "$key" < "$best_key" ]]; then best_key="$key"; best="$repo $num"; fi
-  done < <(gh issue list -R "$repo" --state open --label nightshift --limit 100 \
-            --json number,createdAt,labels \
-            --jq '.[] | select(.labels | map(.name) | (index("nightshift:in-progress") or index("nightshift:blocked")) | not)
-                  | [.number, .createdAt, (.labels | map(.name) | index("nightshift:p1") != null)] | @tsv' 2>/dev/null || true)
+  done < <(gh issue list -R "$repo" --state open --label nightshift --limit 100 --json number,createdAt,labels \
+            | jq -r ".[] | select(.labels | map(.name) | $SKIP | not)
+                  | [.number, .createdAt, (.labels | map(.name) | index(\"nightshift:p1\") != null)] | @tsv" 2>/dev/null || true)
 done
 [ -n "$best" ] && emit issue $best
 
-# 3. Empty queue: propose work from GOALS.md, but only once per UTC day across all repos.
+# Backpressure for self-started work: stop adding to the owner's review pile once it is deep enough.
+max_open="${NIGHTSHIFT_MAX_OPEN_PRS:-3}"; open_prs=0
+for repo in $repos; do
+  n=$(gh pr list -R "$repo" --state open --author "$who" --limit 50 --json number --jq 'length' 2>/dev/null || echo 0)
+  open_prs=$((open_prs + ${n:-0}))
+done
+if [ "$open_prs" -ge "$max_open" ]; then
+  echo "$open_prs open nightshift PRs await review (cap $max_open): not starting self-proposed work"; emit none - -
+fi
+
+# 3. The bot's own proposals: it found the work, so it does the work. No owner label needed.
+#    The owner's review of the PR is the approval. To veto one: close the issue or label it nightshift:hold.
+#    Only issues authored by the bot account count, so nobody else can queue work this way.
+best=""; best_key=""
+for repo in $repos; do
+  while IFS=$'\t' read -r num created; do
+    [ -z "$num" ] && continue
+    has_pr "$repo" "$num" && continue
+    is_blocked "$repo" "$num" && continue
+    if [ -z "$best_key" ] || [[ "$created" < "$best_key" ]]; then best_key="$created"; best="$repo $num"; fi
+  done < <(gh issue list -R "$repo" --state open --author "$who" --limit 100 --json number,createdAt,title,labels \
+            | jq -r ".[] | select(.title | startswith(\"[nightshift proposal]\")) | select(.labels | map(.name) | $SKIP | not)
+                  | [.number, .createdAt] | @tsv" 2>/dev/null || true)
+done
+[ -n "$best" ] && emit issue $best
+
+# 4. Nothing queued anywhere: look for new work (GOALS.md), at most once per UTC day.
 today=$(date -u +%Y-%m-%d)
 for repo in $repos; do
-  n=$(gh issue list -R "$repo" --state all --label nightshift:proposed --search "created:>=$today" --limit 5 --json number --jq 'length' 2>/dev/null || echo 0)
-  [ "${n:-0}" -gt 0 ] && emit none - -
+  n=$(gh issue list -R "$repo" --state all --author "$who" --search "created:>=$today" --limit 20 --json title \
+        | jq '[.[] | select(.title | startswith("[nightshift proposal]"))] | length' 2>/dev/null || echo 0)
+  [ "${n:-0}" -gt 0 ] && { echo "already proposed today in $repo"; emit none - -; }
 done
 emit propose - -

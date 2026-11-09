@@ -5,9 +5,12 @@ An unattended agent that spends your idle Claude capacity on your own backlog. I
 ## How it decides what to do (scripts/pick.sh)
 
 1. **Follow-ups first.** Any open `nightshift/*` PR where you requested changes or commented after its last commit. Your review is the channel back to it.
-2. **Labeled issues.** Open issues labeled `nightshift` in any repo in `repos.txt`. `nightshift:p1` first, then oldest. Skips `nightshift:in-progress`, `nightshift:blocked`, and issues that already have a PR.
-3. **Propose.** Empty queue: it reads `GOALS.md`, inspects the repos, and files up to 3 issues labeled `nightshift:proposed`. Add the `nightshift` label to approve one. At most once a day.
-4. Otherwise it exits in a few seconds and costs nothing.
+2. **Issues you labeled `nightshift`** in any repo in `repos.txt`. `nightshift:p1` first, then oldest.
+3. **Its own proposals.** Issues it filed itself, titled `[nightshift proposal]`. It found the work, so it does the work and opens a PR; you never have to label anything. Your review of the PR is the approval. To veto a proposal, close the issue or label it `nightshift:hold`.
+4. **Find new work.** Nothing queued: it reads `GOALS.md`, inspects the repos, and files up to 3 proposals, at most once a day. The next run starts on them.
+5. Otherwise it exits in a few seconds and costs nothing.
+
+It skips anything in progress, blocked, or already covered by a PR. Self-started work (steps 3 and 4) pauses while `NIGHTSHIFT_MAX_OPEN_PRS` (default 3) of its PRs are waiting for your review, so the pile cannot grow while you are away. Only issues authored by the bot account count as proposals, so nobody else can queue work that way.
 
 ## What it may do without you
 
@@ -34,7 +37,7 @@ Nightshift acts as a **separate bot GitHub account** (here `sneakernaut`), not a
    - an **API key** in a dedicated Console workspace with a monthly spend limit, as `ANTHROPIC_API_KEY` (recommended: a leak costs at most the cap, and it revokes in one click);
    - or `claude setup-token` and secret `CLAUDE_CODE_OAUTH_TOKEN` (draws on your subscription; a long-lived token for your whole plan).
 5. `scripts/labels.sh` creates the labels on every repo in `repos.txt` (run as you, the owner).
-6. Optional repo **variables**: `NIGHTSHIFT_MODEL` (default `claude-sonnet-5-5`), `NIGHTSHIFT_MAX_TURNS` (60), `NIGHTSHIFT_MAX_BUDGET_USD` (3, hard stop per run), `NIGHTSHIFT_MAX_RUNS_PER_DAY` (6), `NIGHTSHIFT_TIMEOUT_MINUTES` (45), `NIGHTSHIFT_ENABLED` (`false` pauses everything).
+6. Optional repo **variables**: `NIGHTSHIFT_MODEL` (default `claude-sonnet-5-5`), `NIGHTSHIFT_MAX_TURNS` (60), `NIGHTSHIFT_MAX_BUDGET_USD` (3, hard stop per run), `NIGHTSHIFT_MAX_RUNS_PER_DAY` (6), `NIGHTSHIFT_MAX_OPEN_PRS` (3), `NIGHTSHIFT_TIMEOUT_MINUTES` (45), `NIGHTSHIFT_ENABLED` (`false` pauses everything).
 7. Enable **auto-merge** in each target repo's settings if you want the trivial-PR path to actually merge (the bot also needs write there for that; without it the PR is just marked ready).
 
 ## Feeding it goals

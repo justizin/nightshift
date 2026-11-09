@@ -9,6 +9,7 @@ grep -vE '^\s*(#|$)' repos.txt | while read -r repo; do
   mk "$repo" nightshift:p1           B60205 "Nightshift picks these first"
   mk "$repo" nightshift:in-progress  FBCA04 "Nightshift is working this right now"
   mk "$repo" nightshift:blocked      D93F0B "Nightshift tried and needs a human decision (see comment)"
-  mk "$repo" nightshift:proposed     C5DEF5 "Nightshift proposed this; add 'nightshift' to approve"
+  mk "$repo" nightshift:proposed     C5DEF5 "Nightshift found this itself and will open a PR for it"
+  mk "$repo" nightshift:hold         BFBFBF "Owner veto: nightshift must not start this"
   mk "$repo" nightshift:trivial      0E8A16 "Docs/typo/dep-patch PR eligible for auto-merge"
 done
