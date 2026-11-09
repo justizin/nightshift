@@ -13,8 +13,11 @@ force_mode="${FORCE_MODE:-}"; force_repo="${FORCE_REPO:-}"; force_num="${FORCE_N
 
 emit() { echo "$1 $2 $3"; [ -n "${GITHUB_OUTPUT:-}" ] && printf 'mode=%s\nrepo=%s\nnumber=%s\n' "$1" "$2" "$3" >> "$GITHUB_OUTPUT"; exit 0; }
 
-if [ -n "$force_mode" ]; then emit "$force_mode" "${force_repo:--}" "${force_num:--}"; fi
-
+# Token sanity: a 401 here means NIGHTSHIFT_GH_PAT is not a valid token (bad paste, revoked, or expired).
+if ! who=$(gh api user --jq .login 2>&1); then
+  echo "::error::GitHub rejected NIGHTSHIFT_GH_PAT: $who. Re-create a CLASSIC token as the bot account (scope: repo) and store it again with: gh secret set NIGHTSHIFT_GH_PAT -R <owner>/nightshift"; exit 1
+fi
+echo "acting as $who"
 # Preflight: every repo must be reachable with issues readable, or the token is misconfigured.
 bad=0
 for repo in $repos; do
@@ -22,6 +25,9 @@ for repo in $repos; do
   if ! gh issue list -R "$repo" --limit 1 >/dev/null 2>&1; then echo "::error::cannot list issues in $repo (Issues permission missing, or issues disabled)"; bad=1; fi
 done
 [ "$bad" = 1 ] && { echo "::error::NIGHTSHIFT_GH_PAT must be a CLASSIC token of the bot account with scope repo (fine-grained tokens cannot reach repos the bot only collaborates on); the bot needs at least read access to every repo in repos.txt"; exit 1; }
+
+if [ -n "$force_mode" ]; then emit "$force_mode" "${force_repo:--}" "${force_num:--}"; fi
+
 
 # 1. Follow-ups: owner's review needs answering. Highest value, and it's "a chat" with the owner.
 for repo in $repos; do
