@@ -38,7 +38,7 @@ Nightshift acts as a **separate bot GitHub account** (here `sneakernaut`), not a
    - or `claude setup-token` and secret `CLAUDE_CODE_OAUTH_TOKEN` (draws on your subscription; a long-lived token for your whole plan).
 5. `scripts/labels.sh` creates the labels on every repo in `repos.txt` (run as you, the owner).
 6. Optional repo **variables**: `NIGHTSHIFT_MODEL` (default `claude-sonnet-5-5`), `NIGHTSHIFT_MAX_TURNS` (60), `NIGHTSHIFT_MAX_BUDGET_USD` (3, hard stop per run), `NIGHTSHIFT_MAX_RUNS_PER_DAY` (6), `NIGHTSHIFT_MAX_OPEN_PRS` (3), `NIGHTSHIFT_TIMEOUT_MINUTES` (45), `NIGHTSHIFT_ENABLED` (`false` pauses everything).
-7. Keep the bot at **read** access on your repos. With write access and no required checks, `gh pr merge --auto` merges immediately, which is how a docs PR merged itself on 2026-11-09. The agent is now denied every merge command, but read-only access is the wall that does not depend on the agent obeying.
+7. Know where the wall is. On a public repo the bot needs no access at all, so it cannot merge. On a **private repo owned by a personal account**, GitHub gives every collaborator write access, and with no required checks `gh pr merge --auto` merges immediately: that is how a docs PR merged itself on 2026-11-09. The agent is now denied every merge command and the runner fails if a self-merge happens, but those depend on the agent's harness. A wall that does not: a branch rule on `main` requiring a review (GitHub Pro for private repos), or owning the repo from an organization where the bot can hold the read role.
 
 ## Feeding it goals
 
