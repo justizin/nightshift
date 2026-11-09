@@ -5,7 +5,7 @@
 set -euo pipefail
 HUB="$(cd "$(dirname "$0")/.." && pwd)"
 mode="$1"; repo="$2"; number="$3"
-MODEL="${NIGHTSHIFT_MODEL:-claude-sonnet-5-5}"; TURNS="${NIGHTSHIFT_MAX_TURNS:-60}"
+MODEL="${NIGHTSHIFT_MODEL:-claude-sonnet-5-5}"; TURNS="${NIGHTSHIFT_MAX_TURNS:-60}"; BUDGET="${NIGHTSHIFT_MAX_BUDGET_USD:-3}"
 export GIT_AUTHOR_NAME=nightshift GIT_COMMITTER_NAME=nightshift
 export GIT_AUTHOR_EMAIL=nightshift@users.noreply.github.com GIT_COMMITTER_EMAIL=nightshift@users.noreply.github.com
 gh auth setup-git >/dev/null
@@ -17,7 +17,7 @@ log_entry() { # mode repo number result
 run_claude() { # workdir prompt-file
   local out
   out=$(cd "$1" && claude -p "$(cat "$2")" \
-      --model "$MODEL" --max-turns "$TURNS" \
+      --model "$MODEL" --max-turns "$TURNS" --max-budget-usd "$BUDGET" \
       --permission-mode acceptEdits --settings "$HUB/.claude/settings.json" \
       --append-system-prompt "$(cat "$HUB/prompts/system.md")" \
       --no-session-persistence --output-format json 2>"$HUB/work/claude.stderr" || true)
@@ -25,7 +25,7 @@ run_claude() { # workdir prompt-file
   RESULT_TEXT=$(echo "$out" | jq -r '.result // empty' 2>/dev/null || true)
   [ -z "$RESULT_TEXT" ] && RESULT_TEXT="(no result text; see run log)"
   COST=$(echo "$out" | jq -r '.total_cost_usd // "?"' 2>/dev/null || echo "?")
-  summary "### nightshift: $mode $repo $number"; summary "model=$MODEL turns<=$TURNS cost=\$$COST"; summary ""; summary "$RESULT_TEXT"
+  summary "### nightshift: $mode $repo $number"; summary "model=$MODEL turns<=$TURNS budget<=\$$BUDGET cost=\$$COST"; summary ""; summary "$RESULT_TEXT"
 }
 
 rm -rf "$HUB/work"; mkdir -p "$HUB/work"

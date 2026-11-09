@@ -24,7 +24,7 @@ An unattended agent that spends your idle Claude capacity on your own backlog. I
    - `claude setup-token` locally (needs a Pro/Max subscription) and save the output as secret `CLAUDE_CODE_OAUTH_TOKEN`. Runs then draw on your subscription's capacity, which is the point.
    - or an API key as `ANTHROPIC_API_KEY` (pay per token).
 4. `scripts/labels.sh` creates the labels on every repo in `repos.txt`.
-5. Optional repo **variables**: `NIGHTSHIFT_MODEL` (default `claude-sonnet-5-5`), `NIGHTSHIFT_MAX_TURNS` (60), `NIGHTSHIFT_MAX_RUNS_PER_DAY` (6), `NIGHTSHIFT_TIMEOUT_MINUTES` (45), `NIGHTSHIFT_ENABLED` (`false` pauses everything).
+5. Optional repo **variables**: `NIGHTSHIFT_MODEL` (default `claude-sonnet-5-5`), `NIGHTSHIFT_MAX_TURNS` (60), `NIGHTSHIFT_MAX_BUDGET_USD` (3, hard stop per run), `NIGHTSHIFT_MAX_RUNS_PER_DAY` (6), `NIGHTSHIFT_TIMEOUT_MINUTES` (45), `NIGHTSHIFT_ENABLED` (`false` pauses everything).
 6. Enable **auto-merge** in each target repo's settings if you want the trivial-PR path to actually merge.
 
 ## Feeding it goals
