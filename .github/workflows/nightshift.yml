@@ -62,8 +62,10 @@ jobs:
       - name: Install Claude Code
         if: steps.pick.outputs.mode && steps.pick.outputs.mode != 'none'
         run: |
-          curl -fsSL https://claude.ai/install.sh | bash
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          curl -fsSL https://claude.ai/install.sh | bash || true
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"; export PATH="$HOME/.local/bin:$PATH"
+          command -v claude >/dev/null || npm install -g @anthropic-ai/claude-code
+          claude --version
 
       - name: Work
         if: steps.pick.outputs.mode && steps.pick.outputs.mode != 'none'
