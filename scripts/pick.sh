@@ -44,8 +44,8 @@ for repo in $repos; do
 done
 
 # Helpers shared by steps 2 and 3.
-has_pr() {  # repo num -> 0 if an open nightshift PR already covers the issue
-  gh pr list -R "$1" --state open --search 'head:nightshift/issue-' --limit 100 --json headRefName --jq '.[].headRefName' 2>/dev/null | grep -qx "nightshift/issue-$2"; }
+has_pr() {  # repo num -> 0 if a nightshift PR in any state (open, merged, closed) already covers the issue
+  gh pr list -R "$1" --state all --search 'head:nightshift/issue-' --limit 200 --json headRefName --jq '.[].headRefName' 2>/dev/null | grep -qx "nightshift/issue-$2"; }
 is_blocked() {  # repo num -> 0 if the bot said "nightshift: blocked" and the owner has not replied since
   gh issue view "$2" -R "$1" --json comments 2>/dev/null | jq -r --arg o "$OWNER" '
     (.comments | map(select(.body | ascii_downcase | startswith("nightshift: blocked"))) | last // empty) as $b

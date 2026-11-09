@@ -6,7 +6,7 @@ Steps:
 3. Otherwise implement the smallest complete change that resolves it. Add or update tests when the repo has a test suite. Run the suite (or the relevant part) and the linters.
 4. Commit on the current branch (already created for you: `nightshift/issue-{N}`). You are `{BOT}`, working from your own fork: push with `git push -u fork HEAD`. The `origin` remote ({REPO}) is read-only for you; never push there.
 5. Open a PR against {REPO} from your fork: `gh pr create -R {REPO} --draft --head {BOT}:nightshift/issue-{N} --title ... --body ...`. The body must include `Closes #{N}`, what changed, how you verified it, and what you deliberately left out. Then:
-   - If the change is trivial (docs, comments, typos, broken links, dependency patch bump) AND the repo has CI: `gh pr ready`, try to add label `nightshift:trivial`, then `gh pr merge --auto --squash`. If either is rejected for lack of permission, leave it ready for review and say so.
+   - If the change is trivial (docs, comments, typos, broken links, dependency patch bump): `gh pr ready`, and start the PR body with the line `Trivial: <one-line reason>` so the owner can merge it at a glance. Try to add the label `nightshift:trivial`; if that is refused, carry on. Do not merge it.
    - Otherwise leave it as a draft for the owner.
 6. Comment on the issue with one line linking the PR.
 7. End with the summary described in your rules.

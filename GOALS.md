@@ -25,5 +25,5 @@ goals (labeled `nightshift:proposed`), never start them unlabeled.
 - Touch deployment credentials, Nomad jobs that are running, or anything that
   needs the Tailscale network. The agent runs in GitHub Actions and cannot
   reach the homelab; validate offline only.
-- Force-push, rewrite history, close issues, or merge anything that is not
-  classified trivial (see prompts/work-issue.md).
+- Force-push, rewrite history, close issues, or merge anything. Merging is the
+  owner's act.

@@ -52,7 +52,7 @@ run_claude() { # workdir prompt-file
   summary "### nightshift ($BOT): $mode $repo $number"; summary "model=$MODEL turns<=$TURNS budget<=\$$BUDGET cost=\$$COST"; summary ""; summary "$RESULT_TEXT"
 }
 tmpl() { sed "s/{BOT}/$BOT/g; s/{OWNER}/$OWNER/g; s/{N}/$number/g; s#{REPO}#$repo#g" "$HUB/prompts/$1"; }
-pr_for_branch() { gh pr list -R "$repo" --state open --search "head:nightshift/issue-$number" --json number --jq 'length'; }
+pr_for_branch() { gh pr list -R "$repo" --state all --search "head:nightshift/issue-$number" --json number --jq 'length'; }
 
 cleanup() { case "$mode" in issue) label issue "$number" remove nightshift:in-progress ;; followup) label pr "$number" remove nightshift:in-progress ;; esac; }
 trap cleanup EXIT
@@ -76,11 +76,16 @@ Opened automatically by nightshift after the agent run ended without creating a 
 
 $RESULT_TEXT" >/dev/null || true
     fi
+    merged=$(gh pr list -R "$repo" --state merged --search "head:nightshift/issue-$number" --json number,mergedBy 2>/dev/null | jq -r --arg b "$BOT" '[.[] | select(.mergedBy.login == $b) | .number] | join(",")' 2>/dev/null || true)
     label issue "$number" remove nightshift:in-progress
     if [ "$(pr_for_branch)" = 0 ] && ! echo "$RESULT_TEXT" | grep -qi 'nightshift: blocked'; then
       gh issue comment "$number" -R "$repo" --body "nightshift ran but produced no PR. Agent summary:
 
 $RESULT_TEXT" >/dev/null || true
+    fi
+    if [ -n "${merged:-}" ]; then
+      echo "::error::nightshift merged its own PR(s) #$merged in $repo. It must never merge; check the bot's access level and the deny rules."
+      log_entry issue "$repo" "$number" self-merged; exit 1
     fi
     log_entry issue "$repo" "$number" ok ;;
   followup)

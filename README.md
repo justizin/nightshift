@@ -16,7 +16,7 @@ It skips anything in progress, blocked, or already covered by a PR. Self-started
 
 - Branch, commit, push **to its own fork**, open a **draft** PR against your repo, comment on the issue it worked.
 - Ask a question: a comment starting `nightshift: blocked`, then stop. The picker skips it until you reply.
-- Auto-merge only PRs it classified **trivial** (docs, typos, links, dependency patch bumps) via `gh pr merge --auto --squash`, which only takes effect if the target repo has auto-merge enabled and CI passes. Everything else waits for you.
+- It never merges. PRs it judges **trivial** (docs, comments, typos, links, dependency patch bumps) are marked ready for review with a `Trivial:` line at the top; everything else stays a draft.
 - Never: force-push, rewrite history, close issues/PRs, touch CI workflows unasked, deploy anything. See `.claude/settings.json` (deny list) and `prompts/system.md`.
 
 ## Identity and safety model
@@ -38,7 +38,7 @@ Nightshift acts as a **separate bot GitHub account** (here `sneakernaut`), not a
    - or `claude setup-token` and secret `CLAUDE_CODE_OAUTH_TOKEN` (draws on your subscription; a long-lived token for your whole plan).
 5. `scripts/labels.sh` creates the labels on every repo in `repos.txt` (run as you, the owner).
 6. Optional repo **variables**: `NIGHTSHIFT_MODEL` (default `claude-sonnet-5-5`), `NIGHTSHIFT_MAX_TURNS` (60), `NIGHTSHIFT_MAX_BUDGET_USD` (3, hard stop per run), `NIGHTSHIFT_MAX_RUNS_PER_DAY` (6), `NIGHTSHIFT_MAX_OPEN_PRS` (3), `NIGHTSHIFT_TIMEOUT_MINUTES` (45), `NIGHTSHIFT_ENABLED` (`false` pauses everything).
-7. Enable **auto-merge** in each target repo's settings if you want the trivial-PR path to actually merge (the bot also needs write there for that; without it the PR is just marked ready).
+7. Keep the bot at **read** access on your repos. With write access and no required checks, `gh pr merge --auto` merges immediately, which is how a docs PR merged itself on 2026-11-09. The agent is now denied every merge command, but read-only access is the wall that does not depend on the agent obeying.
 
 ## Feeding it goals
 

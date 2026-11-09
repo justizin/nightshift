@@ -5,7 +5,7 @@
       "Bash(git push --force*)", "Bash(git push -f*)", "Bash(git push * --force*)",
       "Bash(git reset --hard*)", "Bash(git rebase*)", "Bash(git branch -D*)", "Bash(git push --delete*)",
       "Bash(gh repo delete*)", "Bash(gh repo edit*)", "Bash(gh issue close*)", "Bash(gh issue delete*)",
-      "Bash(gh pr close*)", "Bash(gh pr merge --admin*)", "Bash(gh release*)", "Bash(gh secret*)", "Bash(gh variable*)",
+      "Bash(gh pr close*)", "Bash(gh pr merge*)", "Bash(*gh pr merge*)", "Bash(gh pr review*)", "Bash(gh api *merge*)", "Bash(gh api */merge*)", "Bash(gh release*)", "Bash(gh secret*)", "Bash(gh variable*)",
       "Bash(gh api -X DELETE*)", "Bash(gh api --method DELETE*)",
       "Bash(curl * api.github.com*)", "Bash(rm -rf /*)", "Bash(sudo*)",
       "Read(./.git/config)", "Read(**/.netrc)", "Read(~/.config/gh/**)"
