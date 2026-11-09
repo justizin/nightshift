@@ -11,21 +11,31 @@ An unattended agent that spends your idle Claude capacity on your own backlog. I
 
 ## What it may do without you
 
-- Branch, commit, push, open a **draft** PR, comment on the issue it worked.
-- Ask a question: label `nightshift:blocked` plus a comment, then stop.
+- Branch, commit, push **to its own fork**, open a **draft** PR against your repo, comment on the issue it worked.
+- Ask a question: a comment starting `nightshift: blocked`, then stop. The picker skips it until you reply.
 - Auto-merge only PRs it classified **trivial** (docs, typos, links, dependency patch bumps) via `gh pr merge --auto --squash`, which only takes effect if the target repo has auto-merge enabled and CI passes. Everything else waits for you.
 - Never: force-push, rewrite history, close issues/PRs, touch CI workflows unasked, deploy anything. See `.claude/settings.json` (deny list) and `prompts/system.md`.
 
+## Identity and safety model
+
+Nightshift acts as a **separate bot GitHub account** (here `sneakernaut`), not as you. The bot never pushes to your repositories: it pushes to its own forks and opens pull requests against yours. Read access to your repos is all it needs. Consequences:
+
+- Nothing the agent does can delete or rewrite anything you own. Worst case it damages its own fork, which you can delete and re-fork.
+- Its PRs show up as from the bot, so your review is a real second pair of eyes.
+- Labels on your repos need write access, so they are optional: a blocked task is signalled by an issue comment starting `nightshift: blocked`, and proposals are titled `[nightshift proposal]`.
+- The token must be a **classic** PAT with only the `repo` scope. Fine-grained tokens cannot act on repos the bot merely collaborates on. Leave out `delete_repo` (so it cannot delete repositories) and `workflow` (so it cannot edit CI files) unless you want those.
+
 ## Setup (once)
 
-1. Push this repo to GitHub as `<you>/nightshift`. **Public** means unlimited Actions minutes; private spends your included minutes (about 2,000 min/month on Free). Nothing sensitive lives here: goals are generic, the queue is in each repo's issues.
-2. Create a **fine-grained PAT** at https://github.com/settings/personal-access-tokens/new: resource owner = you, repositories = the ones in `repos.txt` (plus this one), permissions: Contents RW, Issues RW, Pull requests RW, Workflows RW, Actions R, Metadata R. Save it as the repo secret `NIGHTSHIFT_GH_PAT`.
-3. Claude auth, one of:
-   - `claude setup-token` locally (needs a Pro/Max subscription) and save the output as secret `CLAUDE_CODE_OAUTH_TOKEN`. Runs then draw on your subscription's capacity, which is the point.
-   - or an API key as `ANTHROPIC_API_KEY` (pay per token).
-4. `scripts/labels.sh` creates the labels on every repo in `repos.txt`.
-5. Optional repo **variables**: `NIGHTSHIFT_MODEL` (default `claude-sonnet-5-5`), `NIGHTSHIFT_MAX_TURNS` (60), `NIGHTSHIFT_MAX_BUDGET_USD` (3, hard stop per run), `NIGHTSHIFT_MAX_RUNS_PER_DAY` (6), `NIGHTSHIFT_TIMEOUT_MINUTES` (45), `NIGHTSHIFT_ENABLED` (`false` pauses everything).
-6. Enable **auto-merge** in each target repo's settings if you want the trivial-PR path to actually merge.
+1. Push this repo to GitHub as `<you>/nightshift`, public (unlimited Actions minutes). Nothing sensitive lives here.
+2. Give the bot account read access to each repo in `repos.txt` (public repos need nothing). Make sure "Allow forking" is on for private ones.
+3. Signed in **as the bot**, create a classic PAT at https://github.com/settings/tokens/new with scope `repo` only and an expiry (90 days is sensible). Store it: `gh secret set NIGHTSHIFT_GH_PAT -R <you>/nightshift`.
+4. Claude auth, one of:
+   - an **API key** in a dedicated Console workspace with a monthly spend limit, as `ANTHROPIC_API_KEY` (recommended: a leak costs at most the cap, and it revokes in one click);
+   - or `claude setup-token` and secret `CLAUDE_CODE_OAUTH_TOKEN` (draws on your subscription; a long-lived token for your whole plan).
+5. `scripts/labels.sh` creates the labels on every repo in `repos.txt` (run as you, the owner).
+6. Optional repo **variables**: `NIGHTSHIFT_MODEL` (default `claude-sonnet-5-5`), `NIGHTSHIFT_MAX_TURNS` (60), `NIGHTSHIFT_MAX_BUDGET_USD` (3, hard stop per run), `NIGHTSHIFT_MAX_RUNS_PER_DAY` (6), `NIGHTSHIFT_TIMEOUT_MINUTES` (45), `NIGHTSHIFT_ENABLED` (`false` pauses everything).
+7. Enable **auto-merge** in each target repo's settings if you want the trivial-PR path to actually merge (the bot also needs write there for that; without it the PR is just marked ready).
 
 ## Feeding it goals
 

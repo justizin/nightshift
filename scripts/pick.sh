@@ -4,7 +4,7 @@
 #   issue    <repo> <issue>  the highest-priority open issue labeled `nightshift` with no PR yet
 #   propose  - -             queue empty: propose issues from GOALS.md (at most once per day)
 #   none     - -             nothing to do
-# Needs GH_TOKEN (the PAT), OWNER (GitHub login of the human owner).
+# Needs GH_TOKEN (the bot's classic PAT, scope repo), OWNER (GitHub login of the human owner/reviewer).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 OWNER="${OWNER:?set OWNER to the GitHub login of the human owner}"
@@ -21,7 +21,7 @@ for repo in $repos; do
   if ! gh api "repos/$repo" --jq '.full_name' >/dev/null 2>&1; then echo "::error::cannot read $repo with this token (not in the PAT's repository list, or missing Metadata permission)"; bad=1; continue; fi
   if ! gh issue list -R "$repo" --limit 1 >/dev/null 2>&1; then echo "::error::cannot list issues in $repo (Issues permission missing, or issues disabled)"; bad=1; fi
 done
-[ "$bad" = 1 ] && { echo "::error::fix NIGHTSHIFT_GH_PAT at https://github.com/settings/personal-access-tokens (select all repos in repos.txt; Contents, Issues, Pull requests, Workflows: read/write)"; exit 1; }
+[ "$bad" = 1 ] && { echo "::error::NIGHTSHIFT_GH_PAT must be a CLASSIC token of the bot account with scope repo (fine-grained tokens cannot reach repos the bot only collaborates on); the bot needs at least read access to every repo in repos.txt"; exit 1; }
 
 # 1. Follow-ups: owner's review needs answering. Highest value, and it's "a chat" with the owner.
 for repo in $repos; do
@@ -44,6 +44,10 @@ for repo in $repos; do
   while IFS=$'\t' read -r num created p1; do
     [ -z "$num" ] && continue
     echo "$heads" | grep -qx "nightshift/issue-$num" && continue
+    # blocked without labels: a comment by the bot that starts with "nightshift: blocked" and no owner reply after it
+    if gh issue view "$num" -R "$repo" --json comments --jq --arg o "$OWNER" '
+         (.comments | map(select(.body | ascii_downcase | startswith("nightshift: blocked"))) | last // empty) as $b
+         | if $b == null then false else ([.comments[] | select(.author.login == $o and .createdAt > $b.createdAt)] | length == 0) end' 2>/dev/null | grep -qx true; then continue; fi
     key="$([ "$p1" = true ] && echo 0 || echo 1)-$created"
     if [ -z "$best_key" ] || [[ "$key" < "$best_key" ]]; then best_key="$key"; best="$repo $num"; fi
   done < <(gh issue list -R "$repo" --state open --label nightshift --limit 100 \
