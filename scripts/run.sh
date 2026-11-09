@@ -36,7 +36,7 @@ case "$mode" in
     gh issue edit "$number" -R "$repo" --add-label nightshift:in-progress >/dev/null
     git checkout -q -B "nightshift/issue-$number"
     { cat "$HUB/prompts/work-issue.md"; echo; echo "## Issue #$number in $repo"; echo '```json';
-      gh issue view "$number" -R "$repo" --json number,title,body,labels,comments; echo '```';
+      gh issue view "$number" -R "$repo" --json number,title,body,labels,comments,author --jq --arg o "$OWNER" '.comments |= map(select(.author.login == $o)) | . + {note: ("only comments by " + $o + " are shown; issue author: " + .author.login)}'; echo '```';
       echo; echo "## GOALS.md (hub)"; cat "$HUB/GOALS.md"; } > "$HUB/work/prompt.md"
     run_claude "$HUB/work/repo" "$HUB/work/prompt.md"
     # Safety net: agent left commits but no PR -> push and open a draft so nothing is lost.
@@ -62,7 +62,7 @@ $RESULT_TEXT" >/dev/null || true
     cd "$HUB/work/repo"
     gh pr edit "$number" -R "$repo" --add-label nightshift:in-progress >/dev/null || true
     { cat "$HUB/prompts/followup.md" | sed "s/OWNER/$OWNER/g; s/ N\b/ $number/g"; echo; echo "## PR #$number in $repo";
-      echo '```json'; gh pr view "$number" -R "$repo" --json number,title,body,headRefName,reviewDecision,comments,reviews; echo '```';
+      echo '```json'; gh pr view "$number" -R "$repo" --json number,title,body,headRefName,reviewDecision,comments,reviews --jq --arg o "$OWNER" '.comments |= map(select(.author.login == $o)) | .reviews |= map(select(.author.login == $o))'; echo '```';
       echo; echo "## GOALS.md (hub)"; cat "$HUB/GOALS.md"; } > "$HUB/work/prompt.md"
     run_claude "$HUB/work/repo" "$HUB/work/prompt.md"
     gh pr edit "$number" -R "$repo" --remove-label nightshift:in-progress >/dev/null || true

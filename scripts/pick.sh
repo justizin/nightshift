@@ -15,6 +15,14 @@ emit() { echo "$1 $2 $3"; [ -n "${GITHUB_OUTPUT:-}" ] && printf 'mode=%s\nrepo=%
 
 if [ -n "$force_mode" ]; then emit "$force_mode" "${force_repo:--}" "${force_num:--}"; fi
 
+# Preflight: every repo must be reachable with issues readable, or the token is misconfigured.
+bad=0
+for repo in $repos; do
+  if ! gh api "repos/$repo" --jq '.full_name' >/dev/null 2>&1; then echo "::error::cannot read $repo with this token (not in the PAT's repository list, or missing Metadata permission)"; bad=1; continue; fi
+  if ! gh issue list -R "$repo" --limit 1 >/dev/null 2>&1; then echo "::error::cannot list issues in $repo (Issues permission missing, or issues disabled)"; bad=1; fi
+done
+[ "$bad" = 1 ] && { echo "::error::fix NIGHTSHIFT_GH_PAT at https://github.com/settings/personal-access-tokens (select all repos in repos.txt; Contents, Issues, Pull requests, Workflows: read/write)"; exit 1; }
+
 # 1. Follow-ups: owner's review needs answering. Highest value, and it's "a chat" with the owner.
 for repo in $repos; do
   pr=$(gh pr list -R "$repo" --state open --search 'head:nightshift/' --limit 30 \
