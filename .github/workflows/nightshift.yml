@@ -1,0 +1,81 @@
+name: nightshift
+
+# Runs while the owner is normally idle. GitHub cron is UTC only.
+#   0 5-13 * * *     hourly, 21:00-05:00 PST (22:00-06:00 PDT), every night
+#   0 14-23 * * 0,6  hourly, weekend daytime (06:00-15:00 PST)
+# Each run does at most one unit of work; the picker exits in seconds when the queue is empty.
+on:
+  schedule:
+    - cron: '0 5-13 * * *'
+    - cron: '0 14-23 * * 0,6'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: force a mode (issue | followup | propose); leave blank to let the picker decide
+        required: false
+      repo:
+        description: owner/repo (with mode issue/followup)
+        required: false
+      number:
+        description: issue or PR number (with mode issue/followup)
+        required: false
+
+concurrency:
+  group: nightshift
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # the hub only: commit the run log
+
+env:
+  OWNER: ${{ github.repository_owner }}
+  GH_TOKEN: ${{ secrets.NIGHTSHIFT_GH_PAT }}
+  NIGHTSHIFT_MODEL: ${{ vars.NIGHTSHIFT_MODEL || 'claude-sonnet-5-5' }}
+  NIGHTSHIFT_MAX_TURNS: ${{ vars.NIGHTSHIFT_MAX_TURNS || '60' }}
+
+jobs:
+  shift:
+    if: ${{ vars.NIGHTSHIFT_ENABLED != 'false' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ fromJSON(vars.NIGHTSHIFT_TIMEOUT_MINUTES || '45') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Daily cap
+        id: cap
+        run: |
+          max="${{ vars.NIGHTSHIFT_MAX_RUNS_PER_DAY || '6' }}"
+          today=$(date -u +%Y-%m-%d)
+          done=$(cat log/$(date -u +%Y-%m).jsonl 2>/dev/null | grep -c "\"ts\":\"$today" || true)
+          echo "runs today: $done / $max"
+          if [ "${{ github.event_name }}" = schedule ] && [ "$done" -ge "$max" ]; then echo "capped=true" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Pick work
+        if: steps.cap.outputs.capped != 'true'
+        id: pick
+        env:
+          FORCE_MODE: ${{ inputs.mode }}
+          FORCE_REPO: ${{ inputs.repo }}
+          FORCE_NUMBER: ${{ inputs.number }}
+        run: scripts/pick.sh
+
+      - name: Install Claude Code
+        if: steps.pick.outputs.mode && steps.pick.outputs.mode != 'none'
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Work
+        if: steps.pick.outputs.mode && steps.pick.outputs.mode != 'none'
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: scripts/run.sh "${{ steps.pick.outputs.mode }}" "${{ steps.pick.outputs.repo }}" "${{ steps.pick.outputs.number }}"
+
+      - name: Commit run log
+        if: always() && steps.pick.outputs.mode && steps.pick.outputs.mode != 'none'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name nightshift; git config user.email nightshift@users.noreply.github.com
+          git add log/ && git diff --cached --quiet || { git commit -qm "log: ${{ steps.pick.outputs.mode }} ${{ steps.pick.outputs.repo }} ${{ steps.pick.outputs.number }}"; git pull -q --rebase; git push -q; }

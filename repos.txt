@@ -1,0 +1,6 @@
+# One GitHub repo per line that nightshift may work in. Lines starting with # are ignored.
+# Issues in these repos labeled `nightshift` are the agent's queue.
+justizin/outpost
+justizin/OSX-KVM
+justizin/edge-models
+justizin/nightshift
