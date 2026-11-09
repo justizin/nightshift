@@ -13,7 +13,12 @@ MODEL="${NIGHTSHIFT_MODEL:-claude-sonnet-5-5}"; TURNS="${NIGHTSHIFT_MAX_TURNS:-6
 gh auth setup-git >/dev/null
 BOT=$(gh api user --jq .login); BOT_ID=$(gh api user --jq .id)
 export GIT_AUTHOR_NAME="$BOT" GIT_COMMITTER_NAME="$BOT"
-export GIT_AUTHOR_EMAIL="${BOT_ID}+${BOT}@users.noreply.github.com" GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+export GIT_AUTHOR_EMAIL="${BOT_ID}+${BOT}@users.noreply.github.com"
+export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+if [ "$BOT" = "$OWNER" ] && [ "${NIGHTSHIFT_ALLOW_OWNER_TOKEN:-}" != "true" ]; then
+  echo "::error::NIGHTSHIFT_GH_PAT belongs to $OWNER, the owner. Nightshift is meant to act as a separate bot account that only pushes to its own forks. Create the token while signed in to GitHub as the bot account, or set repo variable NIGHTSHIFT_ALLOW_OWNER_TOKEN=true to accept pushing branches directly to your repos."
+  exit 1
+fi
 export BOT OWNER
 summary() { [ -n "${GITHUB_STEP_SUMMARY:-}" ] && printf '%s\n' "$*" >> "$GITHUB_STEP_SUMMARY"; echo "$*"; }
 log_entry() { # mode repo number result
