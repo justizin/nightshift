@@ -33,7 +33,7 @@ if [ -n "$force_mode" ]; then emit "$force_mode" "${force_repo:--}" "${force_num
 for repo in $repos; do
   pr=$(gh pr list -R "$repo" --state open --search 'head:nightshift/' --limit 30 \
         --json number,reviewDecision,comments,reviews,commits,labels \
-        --jq --arg owner "$OWNER" '
+        | jq -r --arg owner "$OWNER" '
           map(select(.labels | map(.name) | index("nightshift:in-progress") | not))
           | map(. as $p
               | ($p.commits | map(.committedDate) | max // "1970") as $last
@@ -51,7 +51,7 @@ for repo in $repos; do
     [ -z "$num" ] && continue
     echo "$heads" | grep -qx "nightshift/issue-$num" && continue
     # blocked without labels: a comment by the bot that starts with "nightshift: blocked" and no owner reply after it
-    if gh issue view "$num" -R "$repo" --json comments --jq --arg o "$OWNER" '
+    if gh issue view "$num" -R "$repo" --json comments 2>/dev/null | jq -r --arg o "$OWNER" '
          (.comments | map(select(.body | ascii_downcase | startswith("nightshift: blocked"))) | last // empty) as $b
          | if $b == null then false else ([.comments[] | select(.author.login == $o and .createdAt > $b.createdAt)] | length == 0) end' 2>/dev/null | grep -qx true; then continue; fi
     key="$([ "$p1" = true ] && echo 0 || echo 1)-$created"

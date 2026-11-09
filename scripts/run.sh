@@ -54,6 +54,8 @@ run_claude() { # workdir prompt-file
 tmpl() { sed "s/{BOT}/$BOT/g; s/{OWNER}/$OWNER/g; s/{N}/$number/g; s#{REPO}#$repo#g" "$HUB/prompts/$1"; }
 pr_for_branch() { gh pr list -R "$repo" --state open --search "head:nightshift/issue-$number" --json number --jq 'length'; }
 
+cleanup() { case "$mode" in issue) label issue "$number" remove nightshift:in-progress ;; followup) label pr "$number" remove nightshift:in-progress ;; esac; }
+trap cleanup EXIT
 rm -rf "$HUB/work"; mkdir -p "$HUB/work"
 case "$mode" in
   issue)
@@ -62,7 +64,7 @@ case "$mode" in
     git checkout -q -B "nightshift/issue-$number"
     { tmpl work-issue.md; echo; echo "## Issue #$number in $repo"; echo '```json';
       gh issue view "$number" -R "$repo" --json number,title,body,labels,comments,author \
-        --jq --arg o "$OWNER" '.comments |= map(select(.author.login == $o)) | . + {note: ("only comments by " + $o + " are shown; issue author: " + .author.login)}'
+        | jq --arg o "$OWNER" '.comments |= map(select(.author.login == $o)) | . + {note: ("only comments by " + $o + " are shown; issue author: " + .author.login)}'
       echo '```'; echo; echo "## GOALS.md (hub)"; cat "$HUB/GOALS.md"; } > "$HUB/work/prompt.md"
     run_claude "$HUB/work/repo" "$HUB/work/prompt.md"
     # Safety net: commits but no PR -> push to the fork and open a draft so nothing is lost.
@@ -86,7 +88,7 @@ $RESULT_TEXT" >/dev/null || true
     label pr "$number" add nightshift:in-progress
     { tmpl followup.md; echo; echo "## PR #$number in $repo"; echo '```json';
       gh pr view "$number" -R "$repo" --json number,title,body,headRefName,headRepositoryOwner,reviewDecision,comments,reviews \
-        --jq --arg o "$OWNER" '.comments |= map(select(.author.login == $o)) | .reviews |= map(select(.author.login == $o))'
+        | jq --arg o "$OWNER" '.comments |= map(select(.author.login == $o)) | .reviews |= map(select(.author.login == $o))'
       echo '```'; echo; echo "## GOALS.md (hub)"; cat "$HUB/GOALS.md"; } > "$HUB/work/prompt.md"
     run_claude "$HUB/work/repo" "$HUB/work/prompt.md"
     label pr "$number" remove nightshift:in-progress
