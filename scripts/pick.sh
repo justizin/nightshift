@@ -29,7 +29,8 @@ done
 if [ -n "$force_mode" ]; then emit "$force_mode" "${force_repo:--}" "${force_num:--}"; fi
 
 
-# 1. Follow-ups: owner's review needs answering. Highest value, and it's "a chat" with the owner.
+# 1. Follow-ups: the owner reviewed or commented AFTER the PR's last commit. Once the bot pushes a fix the
+#    PR is quiet again until the owner speaks, so one review can never trigger a run twice.
 for repo in $repos; do
   pr=$(gh pr list -R "$repo" --state open --search 'head:nightshift/' --limit 30 \
         --json number,reviewDecision,comments,reviews,commits,labels \
@@ -37,8 +38,8 @@ for repo in $repos; do
           map(select(.labels | map(.name) | index("nightshift:in-progress") | not))
           | map(. as $p
               | ($p.commits | map(.committedDate) | max // "1970") as $last
-              | (($p.comments + $p.reviews) | map(select(.author.login == $owner and .submittedAt // .createdAt > $last)) | length) as $new
-              | select($p.reviewDecision == "CHANGES_REQUESTED" or $new > 0)
+              | (($p.comments + $p.reviews) | map(select(.author.login == $owner and ((.submittedAt // .createdAt) > $last))) | length) as $new
+              | select($new > 0)
               | .number) | first // empty' 2>/dev/null || true)
   [ -n "$pr" ] && emit followup "$repo" "$pr"
 done
